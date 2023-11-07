@@ -1,4 +1,5 @@
-const points = []
+let points = []
+let circleMarkers = []
 
 const groups = [
     {
@@ -85,21 +86,60 @@ newGroupButton.addEventListener('click', e => {
     })
 })
 
+const copyToClipboardButton = document.getElementById('copy-to-clipboard')
+copyToClipboardButton.addEventListener('click', event => {
+    let pointsString = 'Location, Latitud, Longitud\n'
+    pointsString += points.map(point => `${point.group}, ${point.latlng.lat}, ${point.latlng.lng}`).join('\n')
+    navigator.clipboard.writeText(pointsString)
+    alert('Copied to clipboard as csv')
+})
+
 function actualizarSidebar() {
     const sidebar = document.getElementById('points-container');
-    sidebar.innerHTML = points.map(point => `<li>${point.group},${point.latlng.lat},${point.latlng.lng}</li>`).join('');
+    sidebar.innerHTML = '';
+
+    points.forEach(point => {
+    const li = document.createElement('li')
+    li.textContent = `${point.group}, ${point.latlng.lat}, ${point.latlng.lng}`
+    li.addEventListener('dblclick', event => {
+        console.log(point.id)
+    })
+
+    const deleteButton = document.createElement('button')
+    deleteButton.innerHTML = '❌'
+    deleteButton.addEventListener('click', event => {
+        points = points.filter(deletedPoint => point.id !== deletedPoint.id);
+
+        const markerIndex = circleMarkers.findIndex(marker => marker.id === point.id);
+        if (markerIndex !== -1) {
+            map.removeLayer(circleMarkers[markerIndex].marker);
+            circleMarkers.splice(markerIndex, 1);
+        }
+        actualizarSidebar()
+    })
+
+    li.appendChild(deleteButton)
+    sidebar.appendChild(li)
+    })
 }
 
 map.on('click', event => {
     const activeGroup = getActiveGroup()
+    const id = event.latlng.lat.toString().slice(-4) + Date.now().toString().slice(-4)
     points.push({
         latlng: event.latlng,
-        group: activeGroup.name
+        group: activeGroup.name,
+        id
     })
-    L.circleMarker(event.latlng,{
+    const circleMarker = L.circleMarker(event.latlng,{
         color: activeGroup.color,
         radius: 3
-    }).addTo(map);
+    });
+    circleMarkers.push({
+        id,
+        marker: circleMarker
+    })
+    circleMarker.addTo(map)
     actualizarSidebar()
 })
 
