@@ -3,11 +3,11 @@ body{
     padding: 0;
 }
 
-main {
+main{
     display: flex;
     flex-direction: row;
 }
-#map { 
+#map{ 
     display: inline-block;
     position: inherit;
     height: 100vh;
@@ -15,12 +15,22 @@ main {
 }
 #group-buttons{
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 3fr 1fr;
 }
-menu {
+#points-container{
+    overflow-y: scroll;
+    height: 60%;
+}
+.editor-button{
+    background: none;
+    border: none;
+}
+button{
+    cursor: pointer;
+}
+menu{
     display: inline-block;
-    height: 100%;
+    height: 100vh;
     width: 30vw;
     margin: 0;
-    padding: .5rem;
 }

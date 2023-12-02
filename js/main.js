@@ -26,6 +26,7 @@ groups.map(group => {
 
     const editGroup = document.createElement('button')
     editGroup.textContent = '✏️'
+    editGroup.className = 'editor-button'
     editGroup.addEventListener('click', e => {
         const groupNameInput = document.createElement('input')
         groupNameInput.type = 'text'
@@ -86,40 +87,55 @@ newGroupButton.addEventListener('click', e => {
     })
 })
 
-const copyToClipboardButton = document.getElementById('copy-to-clipboard')
-copyToClipboardButton.addEventListener('click', event => {
-    let pointsString = 'Location, Latitud, Longitud\n'
+const exportAsCsvButton = document.getElementById('export-csv')
+exportAsCsvButton.addEventListener('click', () => {
+    let pointsString = 'data:text/csv;charset=utf-8,\nLocation, Latitud, Longitud\n'
     pointsString += points.map(point => `${point.group}, ${point.latlng.lat}, ${point.latlng.lng}`).join('\n')
-    navigator.clipboard.writeText(pointsString)
-    alert('Copied to clipboard as csv')
+    
+    var encodedUri = encodeURI(pointsString);
+    var link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "my_data.csv");
+    document.body.appendChild(link);
+
+    link.click();
 })
 
-function actualizarSidebar() {
+const importCsvButton = document.getElementById('import-csv')
+importCsvButton.addEventListener('change', () => {
+    const reader = new FileReader()
+    reader.onload = () => {
+        console.log(reader.result)
+    }
+  reader.readAsBinaryString(importCsvButton.files[0])
+})
+
+function updateSidebar() {
     const sidebar = document.getElementById('points-container');
     sidebar.innerHTML = '';
 
     points.forEach(point => {
-    const li = document.createElement('li')
-    li.textContent = `${point.group}, ${point.latlng.lat}, ${point.latlng.lng}`
-    li.addEventListener('dblclick', event => {
-        console.log(point.id)
-    })
+        const li = document.createElement('li')
+        li.textContent = `${point.group}, ${point.latlng.lat}, ${point.latlng.lng}`
+        li.addEventListener('dblclick', event => {
+            console.log(point.id)
+        })
 
-    const deleteButton = document.createElement('button')
-    deleteButton.innerHTML = '❌'
-    deleteButton.addEventListener('click', event => {
-        points = points.filter(deletedPoint => point.id !== deletedPoint.id);
+        const deleteButton = document.createElement('button')
+        deleteButton.innerHTML = '❌'
+        deleteButton.addEventListener('click', event => {
+            points = points.filter(deletedPoint => point.id !== deletedPoint.id);
 
-        const markerIndex = circleMarkers.findIndex(marker => marker.id === point.id);
-        if (markerIndex !== -1) {
-            map.removeLayer(circleMarkers[markerIndex].marker);
-            circleMarkers.splice(markerIndex, 1);
-        }
-        actualizarSidebar()
-    })
+            const markerIndex = circleMarkers.findIndex(marker => marker.id === point.id);
+            if (markerIndex !== -1) {
+                map.removeLayer(circleMarkers[markerIndex].marker);
+                circleMarkers.splice(markerIndex, 1);
+            }
+            updateSidebar()
+        })
 
-    li.appendChild(deleteButton)
-    sidebar.appendChild(li)
+        li.appendChild(deleteButton)
+        sidebar.appendChild(li)
     })
 }
 
@@ -140,7 +156,7 @@ map.on('click', event => {
         marker: circleMarker
     })
     circleMarker.addTo(map)
-    actualizarSidebar()
+    updateSidebar()
 })
 
 function getActiveGroup() {
@@ -160,7 +176,7 @@ function changeGroupName(groupName, newName) {
     });
 
     changePointGroup(groupName, newName)
-    actualizarSidebar()
+    updateSidebar()
 }
 
 function changePointGroup(groupName, newName) {
@@ -188,8 +204,8 @@ function generateRandomHexColor() {
     const red = Math.floor(Math.random() * 256);
     const green = Math.floor(Math.random() * 256);
     const blue = Math.floor(Math.random() * 256);
-  
+
     const hexColor = `#${red.toString(16)}${green.toString(16)}${blue.toString(16)}`;
-  
+
     return hexColor;
-  }
+}
