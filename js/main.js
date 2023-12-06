@@ -1,13 +1,29 @@
-let points = []
-let circleMarkers = []
-
-const groups = [
-    {
-        name: generateRandomName(),
-        isActive: true,
-        color: generateRandomHexColor()
+class Point {
+    constructor(latlng, group, id) {
+        this.latlng = latlng;
+        this.group = group;
+        this.id = id
     }
-]
+
+    generateCircleMarker() {
+        return L.circleMarker(this.latlng,{
+            color: this.group.color,
+            radius: 3
+        });
+    }
+}
+
+class Zone {
+    constructor(name, isActive, color) {
+        this.name = name;
+        this.isActive = isActive;
+        this.color = color;
+    }
+}
+
+let points = [];
+let circleMarkers = [];
+const groups = [new Zone(generateRandomName(), true, generateRandomHexColor())];
 
 const map = window.L.map('map').setView([-34.626056, -58.496659], 12)
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -49,11 +65,7 @@ groups.map(group => {
 const newGroupButton = document.getElementById('new-group')
 newGroupButton.addEventListener('click', e => {
     const newGroupName = generateRandomName()
-    groups.push({
-        name: newGroupName,
-        isActive: true,
-        color: generateRandomHexColor()
-    })
+    groups.push(new Zone(newGroupName, true, generateRandomHexColor()))
     setGroupActive({name:newGroupName})
     groupsContainer.innerHTML = ''
     groups.map(group => {
@@ -87,9 +99,9 @@ newGroupButton.addEventListener('click', e => {
 })
 
 const copyToClipboardButton = document.getElementById('copy-to-clipboard')
-copyToClipboardButton.addEventListener('click', event => {
-    let pointsString = 'Location, Latitud, Longitud\n'
-    pointsString += points.map(point => `${point.group}, ${point.latlng.lat}, ${point.latlng.lng}`).join('\n')
+copyToClipboardButton.addEventListener('click', () => {
+    let pointsString = 'Location,Latitud,Longitud\n'
+    pointsString += points.map(point => `${point.group.name},${point.latlng.lat},${point.latlng.lng}`).join('\n')
     navigator.clipboard.writeText(pointsString)
     alert('Copied to clipboard as csv')
 })
@@ -99,47 +111,44 @@ function actualizarSidebar() {
     sidebar.innerHTML = '';
 
     points.forEach(point => {
-    const li = document.createElement('li')
-    li.textContent = `${point.group}, ${point.latlng.lat}, ${point.latlng.lng}`
-    li.addEventListener('dblclick', event => {
-        console.log(point.id)
-    })
+        const li = document.createElement('li')
+        li.textContent = `${point.group.name},${point.latlng.lat},${point.latlng.lng}`
+        li.addEventListener('dblclick', event => {
+            console.log(point.id)
+        })
 
-    const deleteButton = document.createElement('button')
-    deleteButton.innerHTML = '❌'
-    deleteButton.addEventListener('click', event => {
-        points = points.filter(deletedPoint => point.id !== deletedPoint.id);
+        const deleteButton = document.createElement('button')
+        deleteButton.innerHTML = '❌'
+        deleteButton.addEventListener('click', event => {
+            points = points.filter(deletedPoint => point.id !== deletedPoint.id);
 
-        const markerIndex = circleMarkers.findIndex(marker => marker.id === point.id);
-        if (markerIndex !== -1) {
-            map.removeLayer(circleMarkers[markerIndex].marker);
-            circleMarkers.splice(markerIndex, 1);
-        }
-        actualizarSidebar()
-    })
+            const markerIndex = circleMarkers.findIndex(marker => marker.id === point.id);
+            if (markerIndex !== -1) {
+                map.removeLayer(circleMarkers[markerIndex].marker);
+                circleMarkers.splice(markerIndex, 1);
+            }
+            actualizarSidebar()
+        })
 
-    li.appendChild(deleteButton)
-    sidebar.appendChild(li)
+        li.appendChild(deleteButton)
+        sidebar.appendChild(li)
     })
 }
 
 map.on('click', event => {
     const activeGroup = getActiveGroup()
+    
     const id = event.latlng.lat.toString().slice(-4) + Date.now().toString().slice(-4)
-    points.push({
-        latlng: event.latlng,
-        group: activeGroup.name,
-        id
-    })
-    const circleMarker = L.circleMarker(event.latlng,{
-        color: activeGroup.color,
-        radius: 3
-    });
+    const newPoint = new Point(event.latlng, activeGroup,id)
+    points.push(newPoint)
+    
+    const marker = newPoint.generateCircleMarker()
     circleMarkers.push({
         id,
-        marker: circleMarker
+        marker
     })
-    circleMarker.addTo(map)
+    marker.addTo(map)
+
     actualizarSidebar()
 })
 
@@ -165,8 +174,8 @@ function changeGroupName(groupName, newName) {
 
 function changePointGroup(groupName, newName) {
     points.forEach(point => {
-        if (point.group === groupName) {
-            point.group = newName;
+        if (point.group.name === groupName) {
+            point.group.name = newName;
         }
     })
 }
@@ -188,8 +197,8 @@ function generateRandomHexColor() {
     const red = Math.floor(Math.random() * 256);
     const green = Math.floor(Math.random() * 256);
     const blue = Math.floor(Math.random() * 256);
-  
+
     const hexColor = `#${red.toString(16)}${green.toString(16)}${blue.toString(16)}`;
-  
+
     return hexColor;
-  }
+}
