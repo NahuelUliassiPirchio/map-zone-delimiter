@@ -42,6 +42,7 @@ groups.map(group => {
 
     const editGroup = document.createElement('button')
     editGroup.textContent = '✏️'
+    editGroup.className = 'editor-button'
     editGroup.addEventListener('click', e => {
         const groupNameInput = document.createElement('input')
         groupNameInput.type = 'text'
@@ -98,15 +99,30 @@ newGroupButton.addEventListener('click', e => {
     })
 })
 
-const copyToClipboardButton = document.getElementById('copy-to-clipboard')
-copyToClipboardButton.addEventListener('click', () => {
-    let pointsString = 'Location,Latitud,Longitud\n'
-    pointsString += points.map(point => `${point.group.name},${point.latlng.lat},${point.latlng.lng}`).join('\n')
-    navigator.clipboard.writeText(pointsString)
-    alert('Copied to clipboard as csv')
+const exportAsCsvButton = document.getElementById('export-csv')
+exportAsCsvButton.addEventListener('click', () => {
+    let pointsString = 'data:text/csv;charset=utf-8,\nLocation, Latitud, Longitud\n'
+    pointsString += points.map(point => `${point.group}, ${point.latlng.lat}, ${point.latlng.lng}`).join('\n')
+    
+    var encodedUri = encodeURI(pointsString);
+    var link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "my_data.csv");
+    document.body.appendChild(link);
+
+    link.click();
 })
 
-function actualizarSidebar() {
+const importCsvButton = document.getElementById('import-csv')
+importCsvButton.addEventListener('change', () => {
+    const reader = new FileReader()
+    reader.onload = () => {
+        console.log(reader.result)
+    }
+  reader.readAsBinaryString(importCsvButton.files[0])
+})
+
+function updateSidebar() {
     const sidebar = document.getElementById('points-container');
     sidebar.innerHTML = '';
 
@@ -127,7 +143,7 @@ function actualizarSidebar() {
                 map.removeLayer(circleMarkers[markerIndex].marker);
                 circleMarkers.splice(markerIndex, 1);
             }
-            actualizarSidebar()
+            updateSidebar()
         })
 
         li.appendChild(deleteButton)
@@ -149,7 +165,7 @@ map.on('click', event => {
     })
     marker.addTo(map)
 
-    actualizarSidebar()
+    updateSidebar()
 })
 
 function getActiveGroup() {
@@ -169,7 +185,7 @@ function changeGroupName(groupName, newName) {
     });
 
     changePointGroup(groupName, newName)
-    actualizarSidebar()
+    updateSidebar()
 }
 
 function changePointGroup(groupName, newName) {
