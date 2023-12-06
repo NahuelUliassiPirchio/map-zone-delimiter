@@ -17,7 +17,16 @@ class Zone {
     constructor(name, isActive, color) {
         this.name = name;
         this.isActive = isActive;
-        this.color = color;
+        this.color = color || generateRandomHexColor();
+    }
+
+    static getZona(zones, zoneName){
+        let mainZone;
+        mainZone = zones.filter(zone => zone.name === zoneName)[0]
+        if(mainZone) return mainZone 
+        mainZone = new Zone(zoneName, false)
+        zones.push(mainZone)
+        return mainZone
     }
 }
 
@@ -32,77 +41,20 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map)
 
 const groupsContainer = document.getElementById('group-buttons')
-groups.map(group => {
-    const groupButton = document.createElement('button')
-    groupButton.textContent = group.name
-    groupButton.style.borderColor = group.color
-    groupButton.addEventListener('click', e => {
-        setGroupActive(group)
-    })
-
-    const editGroup = document.createElement('button')
-    editGroup.textContent = '✏️'
-    editGroup.className = 'editor-button'
-    editGroup.addEventListener('click', e => {
-        const groupNameInput = document.createElement('input')
-        groupNameInput.type = 'text'
-        groupNameInput.value = group.name
-        groupButton.innerHTML = ''
-        groupNameInput.addEventListener('keydown', e => {
-            if (e.key === "Enter") {
-                changeGroupName(group.name, groupNameInput.value)
-                groupButton.innerHTML = groupNameInput.value
-            }
-            else if (e.key === "Escape") groupButton.innerHTML = group.name
-        })
-        groupButton.appendChild(groupNameInput)
-        groupNameInput.focus()
-        groupNameInput.select()
-    })
-    groupsContainer.appendChild(groupButton)
-    groupsContainer.appendChild(editGroup)
-})
+updateGroups()
 
 const newGroupButton = document.getElementById('new-group')
 newGroupButton.addEventListener('click', e => {
     const newGroupName = generateRandomName()
     groups.push(new Zone(newGroupName, true, generateRandomHexColor()))
     setGroupActive({name:newGroupName})
-    groupsContainer.innerHTML = ''
-    groups.map(group => {
-        const groupButton = document.createElement('button')
-        groupButton.textContent = group.name
-        groupButton.style.borderColor = group.color
-        groupButton.addEventListener('click', e => {
-            setGroupActive(group)
-        })
-        const editGroup = document.createElement('button')
-        editGroup.textContent = '✏️'
-        editGroup.addEventListener('click', e => {
-            const groupNameInput = document.createElement('input')
-            groupNameInput.type = 'text'
-            groupNameInput.value = group.name
-            groupButton.innerHTML = ''
-            groupNameInput.addEventListener('keydown', e => {
-                if (e.key === "Enter") {
-                    changeGroupName(group.name, groupNameInput.value)
-                    groupButton.innerHTML = groupNameInput.value
-                }
-                else if (e.key === "Escape") groupButton.innerHTML = group.name
-            })
-            groupButton.appendChild(groupNameInput)
-            groupNameInput.focus()
-            groupNameInput.select()
-        })
-        groupsContainer.appendChild(groupButton)
-        groupsContainer.appendChild(editGroup)
-    })
+    updateGroups()
 })
 
 const exportAsCsvButton = document.getElementById('export-csv')
 exportAsCsvButton.addEventListener('click', () => {
-    let pointsString = 'data:text/csv;charset=utf-8,\nLocation, Latitud, Longitud\n'
-    pointsString += points.map(point => `${point.group}, ${point.latlng.lat}, ${point.latlng.lng}`).join('\n')
+    let pointsString = 'data:text/csv;charset=utf-8,\nLocation,Latitud,Longitud\n'
+    pointsString += points.map(point => `${point.group.name},${point.latlng.lat},${point.latlng.lng}`).join('\n')
     
     var encodedUri = encodeURI(pointsString);
     var link = document.createElement("a");
@@ -117,9 +69,26 @@ const importCsvButton = document.getElementById('import-csv')
 importCsvButton.addEventListener('change', () => {
     const reader = new FileReader()
     reader.onload = () => {
-        console.log(reader.result)
+        reader.result.split('\n').forEach((result, index) => {
+            if(index === 0 || index === 1) return
+            const [location,lat,lng] = result.split(',')
+            const zona = Zone.getZona(groups,location)
+            const latLng = L.latLng(lat, lng)
+            const id = latLng.lat.toString().slice(-4) + Date.now().toString().slice(-4)
+            const newPoint = new Point(latLng, zona, id)
+            points.push(newPoint)
+    
+            const marker = newPoint.generateCircleMarker()
+            circleMarkers.push({
+                id,
+                marker
+            })
+            marker.addTo(map)
+        })
+        updateGroups()
+        updateSidebar()
     }
-  reader.readAsBinaryString(importCsvButton.files[0])
+    reader.readAsBinaryString(importCsvButton.files[0])
 })
 
 function updateSidebar() {
@@ -148,6 +117,38 @@ function updateSidebar() {
 
         li.appendChild(deleteButton)
         sidebar.appendChild(li)
+    })
+}
+
+function updateGroups() {
+    groupsContainer.innerHTML = ''
+    groups.map(group => {
+        const groupButton = document.createElement('button')
+        groupButton.textContent = group.name
+        groupButton.style.borderColor = group.color
+        groupButton.addEventListener('click', e => {
+            setGroupActive(group)
+        })
+        const editGroup = document.createElement('button')
+        editGroup.textContent = '✏️'
+        editGroup.addEventListener('click', e => {
+            const groupNameInput = document.createElement('input')
+            groupNameInput.type = 'text'
+            groupNameInput.value = group.name
+            groupButton.innerHTML = ''
+            groupNameInput.addEventListener('keydown', e => {
+                if (e.key === "Enter") {
+                    changeGroupName(group.name, groupNameInput.value)
+                    groupButton.innerHTML = groupNameInput.value
+                }
+                else if (e.key === "Escape") groupButton.innerHTML = group.name
+            })
+            groupButton.appendChild(groupNameInput)
+            groupNameInput.focus()
+            groupNameInput.select()
+        })
+        groupsContainer.appendChild(groupButton)
+        groupsContainer.appendChild(editGroup)
     })
 }
 
