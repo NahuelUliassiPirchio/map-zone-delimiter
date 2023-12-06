@@ -8,7 +8,8 @@ class Point {
     generateCircleMarker() {
         return L.circleMarker(this.latlng,{
             color: this.group.color,
-            radius: 3
+            radius: 5,
+            fillOpacity: 1
         });
     }
 }
@@ -34,13 +35,15 @@ let points = [];
 let circleMarkers = [];
 const groups = [new Zone(generateRandomName(), true, generateRandomHexColor())];
 
+const sidebar = document.getElementById('points-container');
+const groupsContainer = document.getElementById('group-buttons')
+
 const map = window.L.map('map').setView([-34.626056, -58.496659], 12)
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 }).addTo(map)
 
-const groupsContainer = document.getElementById('group-buttons')
 updateGroups()
 
 const newGroupButton = document.getElementById('new-group')
@@ -79,6 +82,21 @@ importCsvButton.addEventListener('change', () => {
             points.push(newPoint)
     
             const marker = newPoint.generateCircleMarker()
+            marker.on('click', event => {
+                L.DomEvent.stopPropagation(event);
+                const pointListItem= document.getElementById(id)
+                pointListItem.scrollIntoView()
+                pointListItem.style.backgroundColor = 'red'
+        
+                const blinkInterval = setInterval(() => {
+                    pointListItem.style.backgroundColor = (pointListItem.style.backgroundColor === 'red') ? 'transparent' : 'red';
+                }, 500);
+        
+                setTimeout(() => {
+                    clearInterval(blinkInterval);
+                    pointListItem.style.backgroundColor = 'initial';
+                }, 1000);
+            })
             circleMarkers.push({
                 id,
                 marker
@@ -92,15 +110,21 @@ importCsvButton.addEventListener('change', () => {
 })
 
 function updateSidebar() {
-    const sidebar = document.getElementById('points-container');
     sidebar.innerHTML = '';
 
     points.forEach(point => {
         const li = document.createElement('li')
-        li.textContent = `${point.group.name},${point.latlng.lat},${point.latlng.lng}`
-        li.addEventListener('dblclick', event => {
-            console.log(point.id)
-        })
+        li.className = 'point-list-item'
+        li.id = point.id
+
+        const groupFlag = document.createElement('div');
+        groupFlag.className = 'group-flag';
+        groupFlag.innerText = '';
+        groupFlag.style.backgroundColor = point.group.color;
+        li.appendChild(groupFlag);
+        
+        const liText = document.createTextNode(`${point.group.name}, ${point.latlng.lat.toFixed(5)}, ${point.latlng.lng.toFixed(5)}`);
+        li.appendChild(liText);
 
         const deleteButton = document.createElement('button')
         deleteButton.innerHTML = '❌'
@@ -160,6 +184,22 @@ map.on('click', event => {
     points.push(newPoint)
     
     const marker = newPoint.generateCircleMarker()
+    marker.on('click', event => {
+        L.DomEvent.stopPropagation(event);
+        const pointListItem= document.getElementById(id)
+        pointListItem.scrollIntoView()
+        pointListItem.style.backgroundColor = 'red'
+        pointListItem.style.backgroundColor = 'red';
+
+        const blinkInterval = setInterval(() => {
+            pointListItem.style.backgroundColor = (pointListItem.style.backgroundColor === 'red') ? 'transparent' : 'red';
+        }, 500);
+
+        setTimeout(() => {
+            clearInterval(blinkInterval);
+            pointListItem.style.backgroundColor = 'initial';
+        }, 1000);
+    })
     circleMarkers.push({
         id,
         marker

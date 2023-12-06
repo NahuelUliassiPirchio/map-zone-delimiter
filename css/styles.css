@@ -20,6 +20,15 @@ main{
 #points-container{
     overflow-y: scroll;
     height: 60%;
+    list-style: none;
+    padding: .4rem;
+}
+.point-list-item{
+    display: flex;
+}
+.group-flag {
+    width: 20px;
+    height: 20px;
 }
 .editor-button{
     background: none;
@@ -33,4 +42,5 @@ menu{
     height: 100vh;
     width: 30vw;
     margin: 0;
+    padding-left: .6rem;
 }
