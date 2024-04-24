@@ -1,18 +1,15 @@
-const DEFAULT_RADIUS = 5
-
 class Point {
-    constructor(latlng, group, id, radius) {
+    constructor(latlng, group, id) {
         this.latlng = latlng;
         this.group = group;
         this.id = id
-        this.radius = radius || DEFAULT_RADIUS
     }
 
     generateCircleMarker() {
-        return L.circle(this.latlng, {
+        return L.circleMarker(this.latlng,{
             color: this.group.color,
-            radius: this.radius * 10,
-            fillOpacity: .5
+            radius: 5,
+            fillOpacity: 1
         });
     }
 }
@@ -46,7 +43,37 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 }).addTo(map)
-
+function updateGroups() {
+    groupsContainer.innerHTML = ''
+    groups.map(group => {
+        const groupButton = document.createElement('button')
+        groupButton.textContent = group.name
+        groupButton.style.borderColor = group.color
+        groupButton.addEventListener('click', e => {
+            setGroupActive(group)
+        })
+        const editGroup = document.createElement('button')
+        editGroup.textContent = '✏️'
+        editGroup.addEventListener('click', e => {
+            const groupNameInput = document.createElement('input')
+            groupNameInput.type = 'text'
+            groupNameInput.value = group.name
+            groupButton.innerHTML = ''
+            groupNameInput.addEventListener('keydown', e => {
+                if (e.key === "Enter") {
+                    changeGroupName(group.name, groupNameInput.value)
+                    groupButton.innerHTML = groupNameInput.value
+                }
+                else if (e.key === "Escape") groupButton.innerHTML = group.name
+            })
+            groupButton.appendChild(groupNameInput)
+            groupNameInput.focus()
+            groupNameInput.select()
+        })
+        groupsContainer.appendChild(groupButton)
+        groupsContainer.appendChild(editGroup)
+    })
+}
 updateGroups()
 
 const newGroupButton = document.getElementById('new-group')
@@ -59,9 +86,9 @@ newGroupButton.addEventListener('click', e => {
 
 const exportAsCsvButton = document.getElementById('export-csv')
 exportAsCsvButton.addEventListener('click', () => {
-    let pointsString = 'data:text/csv;charset=utf-8,\nGroupName,Latitud,Longitud,Radius\n';
-    pointsString += points.map(point => `${point.group.name},${point.latlng.lat},${point.latlng.lng},${point.radius}`).join('\n');
-
+    let pointsString = 'data:text/csv;charset=utf-8,\nLocation,Latitud,Longitud\n'
+    pointsString += points.map(point => `${point.group.name},${point.latlng.lat},${point.latlng.lng}`).join('\n')
+    
     var encodedUri = encodeURI(pointsString);
     var link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -129,22 +156,6 @@ function updateSidebar() {
         const liText = document.createTextNode(`${point.group.name}, ${point.latlng.lat.toFixed(5)}, ${point.latlng.lng.toFixed(5)}`);
         li.appendChild(liText);
 
-        const radiusSlider = document.createElement('input')
-        radiusSlider.type = 'range'
-        radiusSlider.min = Math.max(0, point.radius - 60).toString();
-        radiusSlider.max = (point.radius + 60).toString();
-        radiusSlider.value = point.radius;
-        radiusSlider.addEventListener('change', e => {
-            const newRadius = parseInt(e.target.value);
-            point.radius = newRadius;
-            const markerIndex = circleMarkers.findIndex(marker => marker.id === point.id);
-            if (markerIndex !== -1) {
-                circleMarkers[markerIndex].marker.setRadius(newRadius);
-            }
-            updateSidebar()
-        })
-        li.appendChild(radiusSlider)
-
         const deleteButton = document.createElement('button')
         deleteButton.innerHTML = '❌'
         deleteButton.addEventListener('click', event => {
@@ -155,6 +166,7 @@ function updateSidebar() {
                 map.removeLayer(circleMarkers[markerIndex].marker);
                 circleMarkers.splice(markerIndex, 1);
             }
+            updateVoronoi()
             updateSidebar()
         })
 
@@ -163,71 +175,110 @@ function updateSidebar() {
     })
 }
 
+function updateVoronoi() {
+    voronoiLayer.clearLayers();
 
-function updateGroups() {
-    groupsContainer.innerHTML = ''
-    groups.map(group => {
-        const groupButton = document.createElement('button')
-        groupButton.textContent = group.name
-        groupButton.style.borderColor = group.color
-        groupButton.addEventListener('click', e => {
-            setGroupActive(group)
-        })
-        const editGroup = document.createElement('button')
-        editGroup.textContent = '✏️'
-        editGroup.addEventListener('click', e => {
-            const groupNameInput = document.createElement('input')
-            groupNameInput.type = 'text'
-            groupNameInput.value = group.name
-            groupButton.innerHTML = ''
-            groupNameInput.addEventListener('keydown', e => {
-                if (e.key === "Enter") {
-                    changeGroupName(group.name, groupNameInput.value)
-                    groupButton.innerHTML = groupNameInput.value
-                }
-                else if (e.key === "Escape") groupButton.innerHTML = group.name
-            })
-            groupButton.appendChild(groupNameInput)
-            groupNameInput.focus()
-            groupNameInput.select()
-        })
-        groupsContainer.appendChild(groupButton)
-        groupsContainer.appendChild(editGroup)
-    })
+    const bounds = map.getBounds();
+    const minLng = bounds.getWest();
+    const minLat = bounds.getSouth();
+    const maxLng = bounds.getEast();
+    const maxLat = bounds.getNorth();
+
+    const pointsForVoronoi = points.map(p => [p.latlng.lng, p.latlng.lat]);
+
+    const delaunay = d3.Delaunay.from(pointsForVoronoi);
+    const voronoi = delaunay.voronoi([minLng, minLat, maxLng, maxLat]);
+
+    for (let i = 0; i < points.length; i++) {
+        const cell = voronoi.cellPolygon(i);
+        if (cell) {
+            const polyline = L.polyline(cell.map(point => [point[1], point[0]]), {
+                color: points[i].group.color,  // Asignar color según el grupo
+                weight: 2
+            });
+            voronoiLayer.addLayer(polyline);
+        }
+    }
 }
 
+
+let voronoiLayer = L.layerGroup().addTo(map);
+
+
+function updateVoronoi() {
+    if (voronoiLayer) {
+        map.removeLayer(voronoiLayer);
+    }
+    voronoiLayer = L.layerGroup();
+
+    const bounds = map.getBounds();
+    const minLng = bounds.getWest();
+    const minLat = bounds.getSouth();
+    const maxLng = bounds.getEast();
+    const maxLat = bounds.getNorth();
+
+    const pointsForVoronoi = points.map(p => [p.latlng.lng, p.latlng.lat]);
+
+    const delaunay = d3.Delaunay.from(pointsForVoronoi);
+    const voronoi = delaunay.voronoi([minLng, minLat, maxLng, maxLat]);
+
+    for (let i = 0; i < points.length; i++) {
+        const cell = voronoi.cellPolygon(i);
+        if (cell) {
+            const polygon = L.polygon(cell.map(point => [point[1], point[0]]), {
+                color: points[i].group.color,
+                fillColor: points[i].group.color,
+                fillOpacity: 0.5,
+                weight: 2
+            });
+            voronoiLayer.addLayer(polygon);
+        }
+    }
+
+    voronoiLayer.addTo(map);
+}
+
+map.on('moveend', updateVoronoi);
+
+
 map.on('click', event => {
-    const activeGroup = getActiveGroup()
-    
-    const id = event.latlng.lat.toString().slice(-4) + Date.now().toString().slice(-4)
-    const newPoint = new Point(event.latlng, activeGroup,id)
-    points.push(newPoint)
-    
-    const marker = newPoint.generateCircleMarker()
-    marker.on('click', event => {
-        L.DomEvent.stopPropagation(event);
-        const pointListItem= document.getElementById(id)
-        pointListItem.scrollIntoView()
-        pointListItem.style.backgroundColor = 'red'
-        pointListItem.style.backgroundColor = 'red';
+    const activeGroup = getActiveGroup();
+    const id = event.latlng.lat.toString().slice(-4) + Date.now().toString().slice(-4);
+    const newPoint = new Point(event.latlng, activeGroup, id);
+    points.push(newPoint);
+    updateVoronoi();
 
-        const blinkInterval = setInterval(() => {
-            pointListItem.style.backgroundColor = (pointListItem.style.backgroundColor === 'red') ? 'transparent' : 'red';
-        }, 500);
+    const marker = newPoint.generateCircleMarker();
+    addMarkerToMap(marker, id);
+});
 
-        setTimeout(() => {
-            clearInterval(blinkInterval);
-            pointListItem.style.backgroundColor = 'initial';
-        }, 1000);
-    })
+function addMarkerToMap(marker, id) {
+    marker.off('click').on('click', (markerEvent) => {
+        L.DomEvent.stopPropagation(markerEvent);
+        highlightPoint(id);
+    });
     circleMarkers.push({
         id,
         marker
-    })
-    marker.addTo(map)
+    });
+    marker.addTo(map);
+}
 
-    updateSidebar()
-})
+function highlightPoint(id) {
+    const pointListItem = document.getElementById(id);
+    pointListItem.scrollIntoView();
+    pointListItem.style.backgroundColor = 'red';
+
+    const blinkInterval = setInterval(() => {
+        pointListItem.style.backgroundColor = (pointListItem.style.backgroundColor === 'red') ? 'transparent' : 'red';
+    }, 500);
+
+    setTimeout(() => {
+        clearInterval(blinkInterval);
+        pointListItem.style.backgroundColor = 'initial';
+    }, 1000);
+}
+
 
 function getActiveGroup() {
     return groups.filter(group => group.isActive)[0]
