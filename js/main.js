@@ -10,9 +10,11 @@ class Point {
     }
 
     generateCircleMarker() {
+        console.log(this.type)
+        console.log(this.radius)
         return this.type === 'radius' ? L.circle(this.latlng, {
             color: this.group.color,
-            radius: this.radius * 10,
+            radius: this.radius,
             fillOpacity: .5
         }):L.circleMarker(this.latlng,{
             color: this.group.color,
@@ -55,7 +57,8 @@ class Zone {
 let polygons = []
 let points = [];
 let circleMarkers = [];
-const groups = [new Zone(generateRandomName(), true, generateRandomHexColor())];
+const groups = []
+groups.push(new Zone(generateRandomName(), true, generateRandomHexColor()))
 
 const sidebar = document.getElementById('points-container');
 const groupsContainer = document.getElementById('group-buttons')
@@ -75,6 +78,70 @@ function updateGroups() {
         groupButton.addEventListener('click', e => {
             setGroupActive(group)
         })
+        const editGroupColor = document.createElement('button')
+        editGroupColor.textContent = '🎨'
+        editGroupColor.addEventListener('click', () => {
+            const colorPicker = document.createElement('input');
+            colorPicker.type = 'color';
+            colorPicker.style.position = 'absolute';
+            colorPicker.style.visibility = 'hidden';
+            document.body.appendChild(colorPicker);
+        
+            colorPicker.click();
+        
+            colorPicker.addEventListener('input', () => {
+                const newColor = colorPicker.value;
+        
+                group.color = newColor;
+        
+                const groupIndex = groups.findIndex(g => g.name === group.name);
+        
+                if (groupIndex !== -1) {
+                    groups[groupIndex] = group;
+
+                    const pointsFromGroup = points.filter(point => point.group.name === group.name)
+                    pointsFromGroup.forEach(point => {
+                        const markerIndex = circleMarkers.findIndex(marker => marker.id === point.id);
+                        if (markerIndex !== -1) {
+                            map.removeLayer(circleMarkers[markerIndex].marker);
+                            circleMarkers.splice(markerIndex, 1);
+                        }
+                    })
+        
+                    updateGroups()
+                    updateSidebar()
+                    updatePolygons(group)
+
+                    pointsFromGroup.forEach(point => {
+                        const marker = point.generateCircleMarker()
+                        marker.on('click', event => {
+                            L.DomEvent.stopPropagation(event);
+                            const pointListItem = document.getElementById(point.id)
+                            pointListItem.scrollIntoView()
+                            pointListItem.style.backgroundColor = 'red'
+                    
+                            const blinkInterval = setInterval(() => {
+                                pointListItem.style.backgroundColor = (pointListItem.style.backgroundColor === 'red') ? 'transparent' : 'red';
+                            }, 500);
+                    
+                            setTimeout(() => {
+                                clearInterval(blinkInterval);
+                                pointListItem.style.backgroundColor = 'initial';
+                            }, 1000);
+                        })
+                        circleMarkers.push({
+                            id:point.id,
+                            marker
+                        })
+                        marker.addTo(map)
+                    })
+
+                    updateVoronoi();
+                }
+        
+                document.body.removeChild(colorPicker);
+            });
+        });
         const editGroup = document.createElement('button')
         editGroup.textContent = '✏️'
         editGroup.addEventListener('click', e => {
@@ -94,6 +161,7 @@ function updateGroups() {
             groupNameInput.select()
         })
         groupsContainer.appendChild(groupButton)
+        groupsContainer.appendChild(editGroupColor)
         groupsContainer.appendChild(editGroup)
     })
 }
@@ -118,11 +186,9 @@ function distanciaEntrePuntos(p1, p2) {
 
 function jarvisMarch(puntos) {
     if (puntos.length < 3) {
-        // No se pueden formar polígonos con menos de 3 puntos
         return puntos;
     }
 
-    // Encontrar el punto con la coordenada y más baja (y mínimo)
     let puntoInicial = puntos.reduce((min, punto) => (punto.lat < min.lat ? punto : min), puntos[0]);
 
     let result = [puntoInicial];
@@ -273,7 +339,7 @@ function updateSidebar() {
         const li = document.createElement('li')
         li.className = 'point-list-item'
         li.id = point.id
-
+        
         const groupFlag = document.createElement('div');
         groupFlag.className = 'group-flag';
         groupFlag.innerText = '';
@@ -299,7 +365,25 @@ function updateSidebar() {
                 updateSidebar()
             })
             li.appendChild(radiusSlider)
+            const radiusLabel = document.createElement('span')
+            radiusLabel.textContent = point.radius
+            li.appendChild(radiusLabel)
         }
+
+        const flyToButton = document.createElement('button')
+        flyToButton.innerHTML = `<svg width="16px" height="16px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <g fill="none" stroke="black" stroke-width="2">
+                <circle cx="12" cy="12" r="4"/>
+                <line x1="12" y1="2" x2="12" y2="6"/>
+                <line x1="12" y1="18" x2="12" y2="22"/>
+                <line x1="2" y1="12" x2="6" y2="12"/>
+                <line x1="18" y1="12" x2="22" y2="12"/>
+            </g>
+        </svg>`
+        flyToButton.addEventListener('click', () => {
+            map.flyTo(point.latlng, 15)
+        })
+        li.appendChild(flyToButton)
 
         const deleteButton = document.createElement('button')
         deleteButton.innerHTML = '❌'
@@ -424,16 +508,14 @@ function changePointGroup(groupName, newName) {
 }
 
 function generateRandomName() {
-    const adjectives = ["Red", "Blue", "Green", "Yellow", "Purple", "Orange"];
-    const nouns = ["Elephant", "Lion", "Tiger", "Giraffe", "Zebra", "Kangaroo"];
+    const existingNames = groups.map(group => group.name)
+    let name;
+    do {
+        const randomNumber = Math.floor(1000 + Math.random() * 9000); 
+        name = `Section${randomNumber}`;
+    } while (existingNames.some(existingName => existingName === name ));
 
-    const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
-    const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
-
-    const timestamp = new Date().getTime();
-    const shortTimestamp = timestamp.toString().slice(-4);
-
-    return `${randomAdjective}${randomNoun}${shortTimestamp}`;
+    return name;
 }
 
 function generateRandomHexColor() {

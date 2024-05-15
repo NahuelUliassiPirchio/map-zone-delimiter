@@ -15,7 +15,7 @@ main{
 }
 #group-buttons{
     display: grid;
-    grid-template-columns: 3fr 1fr;
+    grid-template-columns: 10fr 1fr 1fr;
 }
 #points-container{
     overflow-y: scroll;
@@ -25,6 +25,9 @@ main{
 }
 .point-list-item{
     display: flex;
+}
+.point-list-item .fly-button {
+    height: 10px;
 }
 .group-flag {
     width: 20px;
