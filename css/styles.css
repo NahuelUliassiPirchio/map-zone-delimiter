@@ -2,7 +2,11 @@ body{
     margin: 0;
     padding: 0;
 }
-
+.csv-buttons{
+    display: flex;
+    justify-content: space-around;
+    padding: .4rem;
+}
 main{
     display: flex;
     flex-direction: row;
@@ -17,14 +21,24 @@ main{
     display: grid;
     grid-template-columns: 10fr 1fr 1fr;
 }
+#group-buttons button{
+    background-color: white;
+    font-size: larger;
+    border-width: 3px;
+}
 #points-container{
     overflow-y: scroll;
     height: 60%;
     list-style: none;
     padding: .4rem;
 }
-.point-list-item{
+.point-list-item {
     display: flex;
+    align-items: center;
+    padding: 8px;
+    border: 1px solid #ccc;
+    margin-bottom: 8px;
+    background-color: #fff;
 }
 .point-list-item .fly-button {
     height: 10px;
@@ -32,6 +46,36 @@ main{
 .group-flag {
     width: 20px;
     height: 20px;
+    margin-right: 10px;
+    border-radius: 50%;
+}
+.point-details {
+    flex-grow: 1;
+    margin-right: 10px;
+}
+
+.point-buttons {
+    display: flex;
+    gap: 5px;
+}
+
+.point-buttons button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.point-buttons button svg {
+    width: 16px;
+    height: 16px;
+}
+
+.point-buttons button:hover svg {
+    stroke: red;
+}
+.fly-to-button:hover {
+    background-color: lightblue;
 }
 .editor-button{
     background: none;

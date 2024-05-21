@@ -80,6 +80,7 @@ function updateGroups() {
         })
         const editGroupColor = document.createElement('button')
         editGroupColor.textContent = '🎨'
+        editGroupColor.title = 'Change group color'
         editGroupColor.addEventListener('click', () => {
             const colorPicker = document.createElement('input');
             colorPicker.type = 'color';
@@ -143,7 +144,12 @@ function updateGroups() {
             });
         });
         const editGroup = document.createElement('button')
-        editGroup.textContent = '✏️'
+        editGroup.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+            <path fill="none" d="M0 0h24v24H0z"/>
+            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.41-1.41L14.06 7.19l1.41 1.41L6.83 17.25H5.41v-1.41zm14.73-7.34c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+        </svg>
+        `
         editGroup.addEventListener('click', e => {
             const groupNameInput = document.createElement('input')
             groupNameInput.type = 'text'
@@ -336,22 +342,26 @@ function updateSidebar() {
     sidebar.innerHTML = '';
 
     points.forEach(point => {
-        const li = document.createElement('li')
-        li.className = 'point-list-item'
-        li.id = point.id
+        const li = document.createElement('li');
+        li.className = 'point-list-item';
+        li.id = point.id;
         
         const groupFlag = document.createElement('div');
         groupFlag.className = 'group-flag';
         groupFlag.innerText = '';
+        groupFlag.title = point.group.name
         groupFlag.style.backgroundColor = point.group.color;
         li.appendChild(groupFlag);
         
+        const pointDetails = document.createElement('div');
+        pointDetails.className = 'point-details';
         const liText = document.createTextNode(`${point.group.name}, ${point.latlng.lat.toFixed(5)}, ${point.latlng.lng.toFixed(5)}`);
-        li.appendChild(liText);
-
+        pointDetails.appendChild(liText);
+        li.appendChild(pointDetails);
+        
         if(point.type === 'radius') {
-            const radiusSlider = document.createElement('input')
-            radiusSlider.type = 'range'
+            const radiusSlider = document.createElement('input');
+            radiusSlider.type = 'range';
             radiusSlider.min = Math.max(0, point.radius - 60).toString();
             radiusSlider.max = (point.radius + 60).toString();
             radiusSlider.value = point.radius;
@@ -362,15 +372,19 @@ function updateSidebar() {
                 if (markerIndex !== -1) {
                     circleMarkers[markerIndex].marker.setRadius(newRadius);
                 }
-                updateSidebar()
-            })
-            li.appendChild(radiusSlider)
-            const radiusLabel = document.createElement('span')
-            radiusLabel.textContent = point.radius
-            li.appendChild(radiusLabel)
+                updateSidebar();
+            });
+            pointDetails.appendChild(radiusSlider);
+            
+            const radiusLabel = document.createElement('span');
+            radiusLabel.textContent = `Radius: ${point.radius}`;
+            pointDetails.appendChild(radiusLabel);
         }
 
-        const flyToButton = document.createElement('button')
+        const pointButtons = document.createElement('div');
+        pointButtons.className = 'point-buttons';
+
+        const flyToButton = document.createElement('button');
         flyToButton.innerHTML = `<svg width="16px" height="16px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <g fill="none" stroke="black" stroke-width="2">
                 <circle cx="12" cy="12" r="4"/>
@@ -379,14 +393,21 @@ function updateSidebar() {
                 <line x1="2" y1="12" x2="6" y2="12"/>
                 <line x1="18" y1="12" x2="22" y2="12"/>
             </g>
-        </svg>`
+        </svg>`;
+        flyToButton.className = 'fly-to-button'
+        flyToButton.title = 'Center to this point'
         flyToButton.addEventListener('click', () => {
-            map.flyTo(point.latlng, 15)
-        })
-        li.appendChild(flyToButton)
+            map.flyTo(point.latlng, 15);
+        });
+        pointButtons.appendChild(flyToButton);
 
-        const deleteButton = document.createElement('button')
-        deleteButton.innerHTML = '❌'
+        const deleteButton = document.createElement('button');
+        deleteButton.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+            <path fill="none" d="M0 0h24v24H0z"/>
+            <path d="M3 6h18v2H3V6zm2 3h14v13c0 1.1-.9 2-2 2H7c-1.1 0-2-.9-2-2V9zm3 0v11h2V9H8zm4 0v11h2V9h-2zm4 0v11h2V9h-2zM8.5 4l1-1h5l1 1H20v2H4V4h4.5z"/>
+        </svg>`;
+        deleteButton.title = 'Delete point'
         deleteButton.addEventListener('click', () => {
             points = points.filter(deletedPoint => point.id !== deletedPoint.id);
 
@@ -395,15 +416,17 @@ function updateSidebar() {
                 map.removeLayer(circleMarkers[markerIndex].marker);
                 circleMarkers.splice(markerIndex, 1);
             }
-            if(point.type === 'abstract-area') updateVoronoi()
-            else if (point.type === 'polyline-area') updatePolygons(point.group)
-            updateSidebar()
-        })
+            if(point.type === 'abstract-area') updateVoronoi();
+            else if (point.type === 'polyline-area') updatePolygons(point.group);
+            updateSidebar();
+        });
 
-        li.appendChild(deleteButton)
-        sidebar.appendChild(li)
-    })
+        pointButtons.appendChild(deleteButton);
+        li.appendChild(pointButtons);
+        sidebar.appendChild(li);
+    });
 }
+
 
 let voronoiLayer = L.layerGroup().addTo(map);
 
@@ -506,6 +529,22 @@ function changePointGroup(groupName, newName) {
         }
     })
 }
+
+function hasAssignedPoints() {
+    return points.length > 0;
+}
+
+window.addEventListener('beforeunload', function (event) {
+    if (hasAssignedPoints()) {
+        const message = 'You have unsaved changes. Are you sure you want to leave?';
+        
+        event.preventDefault();
+        
+        event.returnValue = message;
+        
+        return message;
+    }
+});
 
 function generateRandomName() {
     const existingNames = groups.map(group => group.name)
