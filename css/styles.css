@@ -20,6 +20,8 @@ main{
 #group-buttons{
     display: grid;
     grid-template-columns: 10fr 1fr 1fr;
+    max-height: 30%;
+    overflow-y: auto;
 }
 #group-buttons button{
     background-color: white;
@@ -27,8 +29,8 @@ main{
     border-width: 3px;
 }
 #points-container{
-    overflow-y: scroll;
-    height: 60%;
+    overflow-y: auto;
+    max-height: 50%;
     list-style: none;
     padding: .4rem;
 }

@@ -10,8 +10,6 @@ class Point {
     }
 
     generateCircleMarker() {
-        console.log(this.type)
-        console.log(this.radius)
         return this.type === 'radius' ? L.circle(this.latlng, {
             color: this.group.color,
             radius: this.radius,
@@ -24,7 +22,7 @@ class Point {
     }
 }
 
-class Zone {
+class Group {
     constructor(name, isActive, color) {
         this.name = name;
         this.isActive = isActive;
@@ -32,10 +30,9 @@ class Zone {
     }
 
     static getZona(zones, zoneName){
-        let mainZone;
-        mainZone = zones.filter(zone => zone.name === zoneName)[0]
+        let mainZone = zones.filter(zone => zone.name === zoneName)[0]
         if(mainZone) return mainZone 
-        mainZone = new Zone(zoneName, false)
+        mainZone = new Group(zoneName, false)
         zones.push(mainZone)
         return mainZone
     }
@@ -50,7 +47,7 @@ class Zone {
 
     generatePolygon(allPoints) {
         const latlngs = this.getGroupPoints(allPoints).map(point => point.latlng)
-        return L.polygon(Zone.orderPolygonCoordinates(latlngs), {color: this.color})
+        return L.polygon(Group.orderPolygonCoordinates(latlngs), {color: this.color})
     }
 }
 
@@ -58,7 +55,7 @@ let polygons = []
 let points = [];
 let circleMarkers = [];
 const groups = []
-groups.push(new Zone(generateRandomName(), true, generateRandomHexColor()))
+groups.push(new Group(generateRandomName(), true, generateRandomHexColor()))
 
 const sidebar = document.getElementById('points-container');
 const groupsContainer = document.getElementById('group-buttons')
@@ -70,107 +67,101 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 }).addTo(map)
 function updateGroups() {
-    groupsContainer.innerHTML = ''
-    groups.map(group => {
-        const groupButton = document.createElement('button')
-        groupButton.textContent = group.name
-        groupButton.style.borderColor = group.color
-        groupButton.addEventListener('click', e => {
-            setGroupActive(group)
-        })
-        const editGroupColor = document.createElement('button')
-        editGroupColor.textContent = '🎨'
-        editGroupColor.title = 'Change group color'
-        editGroupColor.addEventListener('click', () => {
-            const colorPicker = document.createElement('input');
-            colorPicker.type = 'color';
-            colorPicker.style.position = 'absolute';
-            colorPicker.style.visibility = 'hidden';
-            document.body.appendChild(colorPicker);
+    groupsContainer.innerHTML = '';
+    groups.forEach(group => {
+        const groupButton = createGroupButton(group);
+        const editGroupColor = createEditGroupColorButton(group);
+        const editGroup = createEditGroupButton(group, groupButton);
         
-            colorPicker.click();
-        
-            colorPicker.addEventListener('input', () => {
-                const newColor = colorPicker.value;
-        
-                group.color = newColor;
-        
-                const groupIndex = groups.findIndex(g => g.name === group.name);
-        
-                if (groupIndex !== -1) {
-                    groups[groupIndex] = group;
+        groupsContainer.append(groupButton, editGroupColor, editGroup);
+    });
+}
 
-                    const pointsFromGroup = points.filter(point => point.group.name === group.name)
-                    pointsFromGroup.forEach(point => {
-                        const markerIndex = circleMarkers.findIndex(marker => marker.id === point.id);
-                        if (markerIndex !== -1) {
-                            map.removeLayer(circleMarkers[markerIndex].marker);
-                            circleMarkers.splice(markerIndex, 1);
-                        }
-                    })
-        
-                    updateGroups()
-                    updateSidebar()
-                    updatePolygons(group)
+function createGroupButton(group) {
+    const groupButton = document.createElement('button');
+    groupButton.textContent = group.name;
+    groupButton.style.borderColor = group.color;
+    if(group.isActive) groupButton.style.backgroundColor = lightenHexColor(group.color, 50);
+    groupButton.addEventListener('click', () => setGroupActive(group));
+    return groupButton;
+}
 
-                    pointsFromGroup.forEach(point => {
-                        const marker = point.generateCircleMarker()
-                        marker.on('click', event => {
-                            L.DomEvent.stopPropagation(event);
-                            const pointListItem = document.getElementById(point.id)
-                            pointListItem.scrollIntoView()
-                            pointListItem.style.backgroundColor = 'red'
-                    
-                            const blinkInterval = setInterval(() => {
-                                pointListItem.style.backgroundColor = (pointListItem.style.backgroundColor === 'red') ? 'transparent' : 'red';
-                            }, 500);
-                    
-                            setTimeout(() => {
-                                clearInterval(blinkInterval);
-                                pointListItem.style.backgroundColor = 'initial';
-                            }, 1000);
-                        })
-                        circleMarkers.push({
-                            id:point.id,
-                            marker
-                        })
-                        marker.addTo(map)
-                    })
-
-                    updateVoronoi();
-                }
-        
-                document.body.removeChild(colorPicker);
-            });
+function createEditGroupColorButton(group) {
+    const editGroupColor = document.createElement('button');
+    editGroupColor.textContent = '🎨';
+    editGroupColor.title = 'Change group color';
+    editGroupColor.addEventListener('click', () => {
+        const colorPicker = document.createElement('input');
+        colorPicker.type = 'color';
+        colorPicker.style.position = 'absolute';
+        colorPicker.style.visibility = 'hidden';
+        document.body.appendChild(colorPicker);
+        colorPicker.click();
+        colorPicker.addEventListener('input', () => {
+            group.color = colorPicker.value;
+            updateGroupPointsAndUI(group);
+            document.body.removeChild(colorPicker);
         });
-        const editGroup = document.createElement('button')
-        editGroup.innerHTML = `
+    });
+    return editGroupColor;
+}
+
+function createEditGroupButton(group, groupButton) {
+    const editGroup = document.createElement('button');
+    editGroup.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
             <path fill="none" d="M0 0h24v24H0z"/>
             <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.41-1.41L14.06 7.19l1.41 1.41L6.83 17.25H5.41v-1.41zm14.73-7.34c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
         </svg>
-        `
-        editGroup.addEventListener('click', e => {
-            const groupNameInput = document.createElement('input')
-            groupNameInput.type = 'text'
-            groupNameInput.value = group.name
-            groupButton.innerHTML = ''
-            groupNameInput.addEventListener('keydown', e => {
-                if (e.key === "Enter") {
-                    changeGroupName(group.name, groupNameInput.value)
-                    groupButton.innerHTML = groupNameInput.value
-                }
-                else if (e.key === "Escape") groupButton.innerHTML = group.name
-            })
-            groupButton.appendChild(groupNameInput)
-            groupNameInput.focus()
-            groupNameInput.select()
-        })
-        groupsContainer.appendChild(groupButton)
-        groupsContainer.appendChild(editGroupColor)
-        groupsContainer.appendChild(editGroup)
-    })
+    `;
+    editGroup.addEventListener('click', () => {
+        const groupNameInput = document.createElement('input');
+        groupNameInput.type = 'text';
+        groupNameInput.value = group.name;
+        groupButton.innerHTML = '';
+        groupNameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                changeGroupName(group.name, groupNameInput.value);
+                groupButton.textContent = groupNameInput.value;
+            } else if (e.key === 'Escape') {
+                groupButton.textContent = group.name;
+            }
+        });
+        groupButton.appendChild(groupNameInput);
+        groupNameInput.focus();
+        groupNameInput.select();
+    });
+    return editGroup;
 }
+
+function updateGroupPointsAndUI(group) {
+    const groupIndex = groups.findIndex(g => g.name === group.name);
+    if (groupIndex !== -1) {
+        groups[groupIndex] = group;
+        const pointsFromGroup = points.filter(point => point.group.name === group.name);
+        pointsFromGroup.forEach(point => {
+            const markerIndex = circleMarkers.findIndex(marker => marker.id === point.id);
+            if (markerIndex !== -1) {
+                map.removeLayer(circleMarkers[markerIndex].marker);
+                circleMarkers.splice(markerIndex, 1);
+            }
+        });
+        updateGroups();
+        updateSidebar();
+        updatePolygons(group);
+        pointsFromGroup.forEach(point => {
+            const marker = point.generateCircleMarker();
+            marker.on('click', event => {
+                L.DomEvent.stopPropagation(event);
+                highlightPoint(point.id);
+            });
+            circleMarkers.push({ id: point.id, marker });
+            marker.addTo(map);
+        });
+        updateVoronoi();
+    }
+}
+
 updateGroups()
 
 function generateUniqueId() {
@@ -180,11 +171,11 @@ function generateUniqueId() {
     return `${timestamp}${randomNum}`;
 }
 
-function calcularProductoVectorial(p1, p2, p3) {
+function calculateCrossProduct(p1, p2, p3) {
     return (p2.lng - p1.lng) * (p3.lat - p2.lat) - (p2.lat - p1.lat) * (p3.lng - p2.lng);
 }
 
-function distanciaEntrePuntos(p1, p2) {
+function calculateDistanceBetweenPoints(p1, p2) {
     const deltaX = p2.lng - p1.lng;
     const deltaY = p2.lat - p1.lat;
     return Math.sqrt(deltaX * deltaX + deltaY * deltaY);
@@ -206,10 +197,10 @@ function jarvisMarch(puntos) {
         for (let i = 1; i < puntos.length; i++) {
             if (puntos[i] === puntoActual) continue;
 
-            let direccion = calcularProductoVectorial(puntoActual, siguientePunto, puntos[i]);
+            let direccion = calculateCrossProduct(puntoActual, siguientePunto, puntos[i]);
             if (
                 !siguientePunto || direccion > 0 ||
-                (direccion === 0 && distanciaEntrePuntos(puntoActual, puntos[i]) > distanciaEntrePuntos(puntoActual, siguientePunto))
+                (direccion === 0 && calculateDistanceBetweenPoints(puntoActual, puntos[i]) > calculateDistanceBetweenPoints(puntoActual, siguientePunto))
             ) {
                 siguientePunto = puntos[i];
             }
@@ -255,7 +246,7 @@ function updateVoronoi() {
 const newGroupButton = document.getElementById('new-group')
 newGroupButton.addEventListener('click', e => {
     const newGroupName = generateRandomName()
-    groups.push(new Zone(newGroupName, true, generateRandomHexColor()))
+    groups.push(new Group(newGroupName, true, generateRandomHexColor()))
     setGroupActive({name:newGroupName})
     updateGroups()
 })
@@ -298,7 +289,7 @@ importCsvButton.addEventListener('change', () => {
             if(index === 0 || index === 1) return
             const [location,lat,lng,type,radius] = result.split(',')
             
-            const zona = Zone.getZona(groups,location)
+            const zona = Group.getZona(groups,location)
             const latlng = L.latLng(lat, lng)
             const id = generateUniqueId()
             const newPoint = new Point({latlng, group: zona, id, type})
@@ -310,18 +301,7 @@ importCsvButton.addEventListener('change', () => {
             const marker = newPoint.generateCircleMarker()
             marker.on('click', event => {
                 L.DomEvent.stopPropagation(event);
-                const pointListItem= document.getElementById(id)
-                pointListItem.scrollIntoView()
-                pointListItem.style.backgroundColor = 'red'
-        
-                const blinkInterval = setInterval(() => {
-                    pointListItem.style.backgroundColor = (pointListItem.style.backgroundColor === 'red') ? 'transparent' : 'red';
-                }, 500);
-        
-                setTimeout(() => {
-                    clearInterval(blinkInterval);
-                    pointListItem.style.backgroundColor = 'initial';
-                }, 1000);
+                highlightPoint(id)
             })
             circleMarkers.push({
                 id,
@@ -340,52 +320,75 @@ importCsvButton.addEventListener('change', () => {
 
 function updateSidebar() {
     sidebar.innerHTML = '';
-
     points.forEach(point => {
         const li = document.createElement('li');
         li.className = 'point-list-item';
         li.id = point.id;
-        
-        const groupFlag = document.createElement('div');
-        groupFlag.className = 'group-flag';
-        groupFlag.innerText = '';
-        groupFlag.title = point.group.name
-        groupFlag.style.backgroundColor = point.group.color;
-        li.appendChild(groupFlag);
-        
-        const pointDetails = document.createElement('div');
-        pointDetails.className = 'point-details';
-        const liText = document.createTextNode(`${point.group.name}, ${point.latlng.lat.toFixed(5)}, ${point.latlng.lng.toFixed(5)}`);
-        pointDetails.appendChild(liText);
-        li.appendChild(pointDetails);
-        
-        if(point.type === 'radius') {
-            const radiusSlider = document.createElement('input');
-            radiusSlider.type = 'range';
-            radiusSlider.min = Math.max(0, point.radius - 60).toString();
-            radiusSlider.max = (point.radius + 60).toString();
-            radiusSlider.value = point.radius;
-            radiusSlider.addEventListener('change', e => {
-                const newRadius = parseInt(e.target.value);
-                point.radius = newRadius;
-                const markerIndex = circleMarkers.findIndex(marker => marker.id === point.id);
-                if (markerIndex !== -1) {
-                    circleMarkers[markerIndex].marker.setRadius(newRadius);
-                }
-                updateSidebar();
-            });
-            pointDetails.appendChild(radiusSlider);
-            
-            const radiusLabel = document.createElement('span');
-            radiusLabel.textContent = `Radius: ${point.radius}`;
-            pointDetails.appendChild(radiusLabel);
+        const groupFlag = createGroupFlag(point);
+        const pointDetails = createPointDetails(point);
+        const pointButtons = createPointButtons(point);
+        li.append(groupFlag, pointDetails, pointButtons);
+        sidebar.appendChild(li);
+    });
+}
+
+function createGroupFlag(point) {
+    const groupFlag = document.createElement('div');
+    groupFlag.className = 'group-flag';
+    groupFlag.title = point.group.name;
+    groupFlag.style.backgroundColor = point.group.color;
+    return groupFlag;
+}
+
+function createPointDetails(point) {
+    const pointDetails = document.createElement('div');
+    pointDetails.className = 'point-details';
+    const liText = document.createTextNode(`${point.group.name}, ${point.latlng.lat.toFixed(5)}, ${point.latlng.lng.toFixed(5)}`);
+    pointDetails.appendChild(liText);
+    if (point.type === 'radius') {
+        const radiusSlider = createRadiusSlider(point);
+        const radiusLabel = createRadiusLabel(point);
+        pointDetails.append(radiusSlider, radiusLabel);
+    }
+    return pointDetails;
+}
+
+function createRadiusSlider(point) {
+    const radiusSlider = document.createElement('input');
+    radiusSlider.type = 'range';
+    radiusSlider.min = Math.max(0, point.radius - 60).toString();
+    radiusSlider.max = (point.radius + 60).toString();
+    radiusSlider.value = point.radius;
+    radiusSlider.addEventListener('change', e => {
+        point.radius = parseInt(e.target.value);
+        const markerIndex = circleMarkers.findIndex(marker => marker.id === point.id);
+        if (markerIndex !== -1) {
+            circleMarkers[markerIndex].marker.setRadius(point.radius);
         }
+        updateSidebar();
+    });
+    return radiusSlider;
+}
 
-        const pointButtons = document.createElement('div');
-        pointButtons.className = 'point-buttons';
+function createRadiusLabel(point) {
+    const radiusLabel = document.createElement('span');
+    radiusLabel.textContent = `Radius: ${point.radius}`;
+    return radiusLabel;
+}
 
-        const flyToButton = document.createElement('button');
-        flyToButton.innerHTML = `<svg width="16px" height="16px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+function createPointButtons(point) {
+    const pointButtons = document.createElement('div');
+    pointButtons.className = 'point-buttons';
+    const flyToButton = createFlyToButton(point);
+    const deleteButton = createDeleteButton(point);
+    pointButtons.append(flyToButton, deleteButton);
+    return pointButtons;
+}
+
+function createFlyToButton(point) {
+    const flyToButton = document.createElement('button');
+    flyToButton.innerHTML = `
+        <svg width="16px" height="16px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <g fill="none" stroke="black" stroke-width="2">
                 <circle cx="12" cy="12" r="4"/>
                 <line x1="12" y1="2" x2="12" y2="6"/>
@@ -394,39 +397,33 @@ function updateSidebar() {
                 <line x1="18" y1="12" x2="22" y2="12"/>
             </g>
         </svg>`;
-        flyToButton.className = 'fly-to-button'
-        flyToButton.title = 'Center to this point'
-        flyToButton.addEventListener('click', () => {
-            map.flyTo(point.latlng, 15);
-        });
-        pointButtons.appendChild(flyToButton);
+    flyToButton.className = 'fly-to-button';
+    flyToButton.title = 'Center to this point';
+    flyToButton.addEventListener('click', () => map.flyTo(point.latlng, 15));
+    return flyToButton;
+}
 
-        const deleteButton = document.createElement('button');
-        deleteButton.innerHTML = `
+function createDeleteButton(point) {
+    const deleteButton = document.createElement('button');
+    deleteButton.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
             <path fill="none" d="M0 0h24v24H0z"/>
             <path d="M3 6h18v2H3V6zm2 3h14v13c0 1.1-.9 2-2 2H7c-1.1 0-2-.9-2-2V9zm3 0v11h2V9H8zm4 0v11h2V9h-2zm4 0v11h2V9h-2zM8.5 4l1-1h5l1 1H20v2H4V4h4.5z"/>
         </svg>`;
-        deleteButton.title = 'Delete point'
-        deleteButton.addEventListener('click', () => {
-            points = points.filter(deletedPoint => point.id !== deletedPoint.id);
-
-            const markerIndex = circleMarkers.findIndex(marker => marker.id === point.id);
-            if (markerIndex !== -1) {
-                map.removeLayer(circleMarkers[markerIndex].marker);
-                circleMarkers.splice(markerIndex, 1);
-            }
-            if(point.type === 'abstract-area') updateVoronoi();
-            else if (point.type === 'polyline-area') updatePolygons(point.group);
-            updateSidebar();
-        });
-
-        pointButtons.appendChild(deleteButton);
-        li.appendChild(pointButtons);
-        sidebar.appendChild(li);
+    deleteButton.title = 'Delete point';
+    deleteButton.addEventListener('click', () => {
+        points = points.filter(deletedPoint => point.id !== deletedPoint.id);
+        const markerIndex = circleMarkers.findIndex(marker => marker.id === point.id);
+        if (markerIndex !== -1) {
+            map.removeLayer(circleMarkers[markerIndex].marker);
+            circleMarkers.splice(markerIndex, 1);
+        }
+        if (point.type === 'abstract-area') updateVoronoi();
+        else if (point.type === 'polyline-area') updatePolygons(point.group);
+        updateSidebar();
     });
+    return deleteButton;
 }
-
 
 let voronoiLayer = L.layerGroup().addTo(map);
 
@@ -508,6 +505,7 @@ function getActiveGroup() {
 
 function setGroupActive(activeGroup){
     groups.forEach(group => group.isActive = group.name === activeGroup.name)
+    updateGroups()
 }
 
 function changeGroupName(groupName, newName) {
@@ -537,11 +535,8 @@ function hasAssignedPoints() {
 window.addEventListener('beforeunload', function (event) {
     if (hasAssignedPoints()) {
         const message = 'You have unsaved changes. Are you sure you want to leave?';
-        
         event.preventDefault();
-        
         event.returnValue = message;
-        
         return message;
     }
 });
@@ -565,4 +560,27 @@ function generateRandomHexColor() {
     const hexColor = `#${red.toString(16)}${green.toString(16)}${blue.toString(16)}`;
 
     return hexColor;
+}
+
+function lightenHexColor(hex, percent) {
+    hex = hex.replace(/^#/, '');
+
+    if (hex.length === 3) {
+        hex = hex.split('').map(char => char + char).join('');
+    }
+
+    let r = parseInt(hex.substring(0, 2), 16);
+    let g = parseInt(hex.substring(2, 4), 16);
+    let b = parseInt(hex.substring(4, 6), 16);
+
+    r = Math.min(255, Math.floor(r + (255 - r) * (percent / 100)));
+    g = Math.min(255, Math.floor(g + (255 - g) * (percent / 100)));
+    b = Math.min(255, Math.floor(b + (255 - b) * (percent / 100)));
+
+    let newHex = '#' + [r, g, b].map(component => {
+        const hexComponent = component.toString(16);
+        return hexComponent.length === 1 ? '0' + hexComponent : hexComponent;
+    }).join('');
+
+    return newHex;
 }
