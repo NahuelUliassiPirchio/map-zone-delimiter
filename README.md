@@ -12,20 +12,6 @@
 
 ## Installation
 1. Clone the repository:
-# Map Zone Delimiter
-
-## Description
-**Map Zone Delimiter** is an interactive tool that allows you to create and manage different types of geospatial zones on a map using the Leaflet library. This project was developed to facilitate the assignment of values in different geographic areas, providing options to create zones by radius, polyline areas, and abstract areas using Voronoi diagrams.
-
-## Features
-- **Radius Zones**: Allows creating adjustable radius circles on the map.
-- **Polyline Areas**: Facilitates the creation of polygons based on selected points.
-- **Abstract Areas (Voronoi)**: Generates Voronoi diagrams to segment the map into abstract zones.
-- **CSV Import and Export**: Supports importing and exporting geospatial data in CSV format.
-- **Group Management**: Points on the map can be easily grouped and managed.
-
-## Installation
-1. Clone the repository:
 ```bash
 	git clone https://github.com/yourusername/map-zone-delimiter.git
 	cd map-zone-delimiter
